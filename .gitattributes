@@ -1,1 +1,2 @@
 frontend/public/assets/makehuman/targets.bin filter=lfs diff=lfs merge=lfs -text
+frontend/public/data/targets/targets.bin filter=lfs diff=lfs merge=lfs -text
