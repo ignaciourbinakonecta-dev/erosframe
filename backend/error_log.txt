@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "C:\Users\user\.gemini\antigravity\scratch\ai-video-platform\backend\app\api\avatars.py", line 120, in generate_portrait
+    image_b64 = await generate_avatar_image(req.prompt)
+  File "C:\Users\user\.gemini\antigravity\scratch\ai-video-platform\backend\app\services\modal_service.py", line 124, in generate_avatar_image
+    response.raise_for_status()
+  File "C:\Users\user\AppData\Local\Programs\Python\Python310\lib\site-packages\httpx\_models.py", line 759, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'https://ignaciourbinakonecta--avatar-generate.modal.run/?__modal_function_call_id=fc-01KKY757P3P3887Y3W4WEFMZ7P'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500

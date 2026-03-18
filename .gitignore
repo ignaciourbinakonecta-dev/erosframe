@@ -1,0 +1,34 @@
+# Node
+node_modules/
+.next/
+dist/
+build/
+
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env.bak/
+venv.bak/
+
+# Next.js
+out/
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
