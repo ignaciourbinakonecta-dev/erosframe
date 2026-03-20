@@ -14,15 +14,12 @@ logger = logging.getLogger(__name__)
 
 app = modal.App("erosframe-avatar-generator")
 
-HF_TOKEN = "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"
+
+# No HF_TOKEN needed for SDXL-Turbo
 
 def download_model():
-    import os
-    from huggingface_hub import snapshot_download, login
-    token = os.environ.get("HF_TOKEN")
-    if token:
-        login(token=token)
-    print("Pre-downloading FLUX.1-schnell model weights into the Modal image...")
+    from huggingface_hub import snapshot_download
+    print("Pre-downloading FLUX.1-schnell model weights...")
     snapshot_download("black-forest-labs/FLUX.1-schnell")
     print("Download complete.")
 
@@ -42,7 +39,7 @@ image = (
         "bitsandbytes",
         "optimum"
     )
-    .run_function(download_model, secrets=[modal.Secret.from_dict({"HF_TOKEN": HF_TOKEN})])
+    .run_function(download_model)
 )
 
 app.image = image
@@ -50,9 +47,8 @@ app.image = image
 # Keep model warm between calls (reduces cold-start cost)
 with image.imports():
     import torch
-    from diffusers import FluxPipeline
+    from diffusers import AutoPipelineForText2Image, AutoPipelineForImage2Image
     from PIL import Image
-    from huggingface_hub import login
 
 
 @app.cls(
@@ -60,64 +56,51 @@ with image.imports():
     timeout=1200,       # 20 min max
     memory=32768,       # 32GB System RAM
     scaledown_window=120,
-    secrets=[modal.Secret.from_dict({"HF_TOKEN": HF_TOKEN})]
 )
 class AvatarGenerator:
     @modal.enter()
     def load_model(self):
-        import os
-        from diffusers import FluxPipeline
+        from diffusers import AutoPipelineForText2Image
         import torch
-        from huggingface_hub import login
         
         logger.info("Starting load_model...")
-        token = os.environ.get("HF_TOKEN")
-        if token:
-            logger.info("Logging into Hugging Face...")
-            login(token=token)
             
-        logger.info("Downloading/Loading FLUX.1-dev model with 4-bit quantization and CPU offload...")
-        
+        logger.info("Loading FLUX.1-schnell Pipeline...")
         try:
-            # We use FLUX.1-schnell which is faster and lighter
-            self.pipe = FluxPipeline.from_pretrained(
+            self.pipe = AutoPipelineForText2Image.from_pretrained(
                 "black-forest-labs/FLUX.1-schnell",
-                torch_dtype=torch.bfloat16,
-            )
-            logger.info("Enabling sequential CPU offload...")
-            self.pipe.enable_sequential_cpu_offload()
-            logger.info("Model loaded and configured successfully.")
+                torch_dtype=torch.float16,
+                variant="fp16"
+            ).to("cuda")
+            logger.info("Model loaded successfully.")
         except Exception as e:
             logger.error(f"Error loading model: {str(e)}")
             raise
 
     @modal.method()
-    def generate(self, prompt: str, width: int = 768, height: int = 1024, steps: int = 4, init_image_b64: str = None, strength: float = 0.55) -> str:
+    def generate(self, prompt: str, width: int = 768, height: int = 1024, steps: int = 4, init_image_b64: str | None = None, strength: float = 0.55) -> str:
         """Generate an image and return it as base64 PNG string."""
         import base64
         import io
         from PIL import Image
-        from diffusers import FluxImg2ImgPipeline
         
-        logger.info(f"Generating image (FLUX-schnell) for prompt: {prompt[:50]}...")
+        logger.info(f"Generating image (FLUX.1-schnell) for prompt: {prompt[:50]}...")
         try:
             if init_image_b64:
                 logger.info(f"Using img2img with strength {strength}")
                 init_image = Image.open(io.BytesIO(base64.b64decode(init_image_b64))).convert("RGB")
-                
-                # Resize if necessary, though ideally it should match the requested width/height
                 if init_image.size != (width, height):
                     init_image = init_image.resize((width, height), Image.LANCZOS)
                 
-                # Create img2img pipeline reusing components from txt2img pipe to save memory
-                pipe_i2i = FluxImg2ImgPipeline(**self.pipe.components)
+                # Create img2img pipeline from txt2img components
+                pipe_i2i = AutoPipelineForImage2Image.from_pipe(self.pipe)
                 
                 image = pipe_i2i(
                     prompt=prompt,
                     image=init_image,
                     strength=strength,
                     num_inference_steps=steps,
-                    guidance_scale=0.0, # Schnell doesn't use guidance
+                    guidance_scale=0.0,
                 ).images[0]
             else:
                 logger.info("Using standard txt2img")
@@ -126,7 +109,7 @@ class AvatarGenerator:
                     width=width,
                     height=height,
                     num_inference_steps=steps,
-                    guidance_scale=0.0, # Schnell doesn't use guidance
+                    guidance_scale=0.0,
                 ).images[0]
 
             logger.info("Encoding image to base64...")

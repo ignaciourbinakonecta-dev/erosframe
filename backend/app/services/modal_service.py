@@ -3,6 +3,7 @@
 import httpx
 import base64
 from pathlib import Path
+from typing import Any
 from app.config import settings
 
 MODAL_ENDPOINT_URL: str = settings.MODAL_ENDPOINT_URL
@@ -82,7 +83,7 @@ def build_avatar_prompt(
 
     parts += [
         f"wearing {outfit}",
-        "raw photo, masterpiece, 85mm lens, f/1.8, bokeh, natural skin texture, visible pores, professional studio lighting, cinematic color grading, sharp focus",
+        "RAW photo, masterpiece, best quality, 85mm lens, f/1.8, bokeh, smooth clean skin, flawless complexion, no artifacts, no noise, professional studio lighting, cinematic color grading, sharp focus",
     ]
 
     if extra.strip():
@@ -101,29 +102,45 @@ async def generate_avatar_image(prompt: str, base_image_b64: str | None = None, 
             "MODAL_ENDPOINT_URL no configurado. Corre: modal deploy modal_app.py y copia la URL al .env"
         )
 
-    payload = {
+    payload: dict[str, Any] = {
         "prompt": prompt,
         "width": 768,
         "height": 1024,
-        "steps": 28,
+        "steps": 4,
     }
     
     if base_image_b64:
         payload["init_image_b64"] = base_image_b64
         payload["strength"] = strength
 
-    # Modal web endpoints accept token auth via Basic Auth
-    auth = (MODAL_TOKEN_ID, MODAL_TOKEN_SECRET) if MODAL_TOKEN_ID else None
+    # Modal web endpoints accept token auth via custom headers
+    headers = {
+        "Content-Type": "application/json",
+        "x-modal-token-id": MODAL_TOKEN_ID,
+        "x-modal-token-secret": MODAL_TOKEN_SECRET
+    }
 
     async with httpx.AsyncClient(timeout=600.0, follow_redirects=True) as client:
-        response = await client.post(
-            MODAL_ENDPOINT_URL,
-            json=payload,
-            auth=auth,
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data["image_b64"]
+        try:
+            response = await client.post(
+                MODAL_ENDPOINT_URL,
+                json=payload,
+                headers=headers,
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            if "image_b64" not in data:
+                raise ValueError("Modal response missing 'image_b64'")
+                
+            return data["image_b64"]
+        except httpx.HTTPStatusError as e:
+            error_detail = e.response.text
+            print(f"Modal HTTP Error {e.response.status_code}: {error_detail}")
+            raise ValueError(f"Modal Service Error: {error_detail or str(e)}")
+        except Exception as e:
+            print(f"Error calling Modal FLUX: {e}")
+            raise
 
 
 async def save_avatar_image(b64_str: str, filename: str) -> str:

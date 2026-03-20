@@ -49,7 +49,7 @@ export default function PortraitGeneratorModal({ isOpen, onClose, onSelectImage 
         if (constitution) promptParams.push(`constitución física ${constitution.toLowerCase()}`);
         if (ethnicity) promptParams.push(`etnia ${ethnicity.toLowerCase()}`);
 
-        const basePrompt = `Portrait photo, upper body, facing camera directly, neutral lighting, passport style but cinematic, detailed face. Person characteristics: ${promptParams.join(', ')}. Photorealistic, 8k, raw photo, highly detailed skin pores.`;
+        const basePrompt = `Portrait photo, upper body, facing camera directly, neutral lighting, passport style but cinematic, highly detailed face. Person characteristics: ${promptParams.join(', ')}. Photorealistic, 8k, RAW photo, smooth flawless skin, clean face, studio portrait, sharp focus, no artifacts, no noise, professional quality.`;
 
         try {
             const data = await api.generatePortrait(basePrompt);
@@ -59,15 +59,12 @@ export default function PortraitGeneratorModal({ isOpen, onClose, onSelectImage 
             
             setHistory(prev => [imageUrl, ...prev]);
             setSelectedImage(imageUrl);
-        } catch (error) {
-            console.error(error);
-            alert("Error al generar la imagen. (Endpoint en construcción)");
+        } catch (error: any) {
+            console.error("Error generating portrait:", error);
+            const errorMessage = error.message || "Error desconocido al generar la imagen.";
+            alert(`Error al generar la imagen: ${errorMessage}`);
             
-            // Mock response for UI testing
-            const mockImg = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=600&auto=format&fit=crop";
-            setHistory(prev => [mockImg, ...prev]);
-            setSelectedImage(mockImg);
-            
+            // Note: Removed mock image fallback to avoid confusion with actual errors
         } finally {
             setIsGenerating(false);
         }

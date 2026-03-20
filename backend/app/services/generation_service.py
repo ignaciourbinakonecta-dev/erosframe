@@ -298,6 +298,11 @@ echo "ComfyUI started"
         comfy = ComfyUIClient(ip)
         clips = []
 
+        avatar = None
+        if project.avatar_id:
+            from app.models.avatar import Avatar
+            avatar = await db.get(Avatar, project.avatar_id)
+
         for shot in shots:
             shot.status = "generating"
             await db.flush()
@@ -305,13 +310,20 @@ echo "ComfyUI started"
             try:
                 # Load and configure workflow
                 workflow = comfy.load_workflow(tier_cfg["workflow"])
+                
+                # Construct avatar URL for the remote instance
+                avatar_url = None
+                if avatar and avatar.reference_pack_url:
+                    avatar_url = f"{settings.BACKEND_URL}{avatar.reference_pack_url}"
+
                 params = {
                     "prompt": self._build_full_prompt(project, shot),
                     "negative_prompt": self._build_negative_prompt(project, shot),
                     "seed": hash(f"{project.id}-{shot.id}") % (2**32),
                     "lora_strength": tier_cfg.get("lora_strength", 0.8),
                     "avatar_id": project.avatar_id,
-                    "controlnet_type": tier_cfg["controlnet"][0].lower(),
+                    "avatar_url": avatar_url,
+                    "controlnet_type": tier_cfg["controlnet"][0].lower() if tier_cfg.get("controlnet") else "pose",
                     "fps": tier_cfg["fps"],
                     "frames": int(shot.duration_target_sec * tier_cfg["fps"]),
                 }

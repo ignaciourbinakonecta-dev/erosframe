@@ -110,6 +110,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "AI Video Platform"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
+    BACKEND_URL: str = "http://localhost:8000"
 
     # Auth
     JWT_SECRET: str = "change-me-in-production-please"

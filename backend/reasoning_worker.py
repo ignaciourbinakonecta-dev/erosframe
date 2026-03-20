@@ -42,7 +42,7 @@ class ReasoningAgent:
         subprocess.run(["ollama", "pull", "llama3"])
         print("Llama 3 is ready.")
 
-    @modal.web_endpoint(method="POST")
+    @modal.fastapi_endpoint(method="POST")
     def reason(self, req: dict):
         import requests
         
